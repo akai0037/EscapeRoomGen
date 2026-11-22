@@ -1,0 +1,28 @@
+# Unreal Engine 5 generated folders (never commit these)
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+Build/
+Plugins/*/Binaries/
+Plugins/*/Intermediate/
+
+# IDE / OS files
+.vs/
+.vscode/
+.idea/
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Python caches and throwaway editor scripts
+__pycache__/
+*.pyc
+Scripts/_scratch/
+Scripts/git_setup.py
