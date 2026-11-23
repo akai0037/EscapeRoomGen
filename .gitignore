@@ -26,3 +26,8 @@ __pycache__/
 *.pyc
 Scripts/_scratch/
 Scripts/git_setup.py
+
+# Fab / Marketplace packs downloaded for trying out models (several GB - keep them out of the repo)
+Content/Cigar_room/
+Content/UnrealBucket/
+Content/Fab/

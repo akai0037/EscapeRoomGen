@@ -11,6 +11,7 @@ What it does (all in the editor, no Play needed):
   Generate   - calls BP_RoomGenerator.GenerateRoom(seed) on the RoomGenerator in the level
   Clear      - removes every BP_Note from the level
   Focus      - selects the generated note and points the viewport camera at it
+  Room layout - width, depth and furniture count for each difficulty (see er_layout.py)
   Clue spots - lists every BP_ClueSpot, adds a new spot on top of the selected actor, deletes spots
   Batch test - generates seeds 0..N-1 at the chosen difficulty (furniture is shuffled into the
                FurnitureSlots by the seed too), checks no furniture overlaps, every room is solvable
@@ -20,6 +21,7 @@ What it does (all in the editor, no Play needed):
 import os
 import sys
 import random
+import importlib
 
 import unreal
 
@@ -32,13 +34,18 @@ for _SITE in (os.path.join(_HERE, "site-packages"),
 
 from PySide6 import QtCore, QtWidgets  # noqa: E402
 
+if _HERE not in sys.path:
+    sys.path.append(_HERE)
+import er_layout  # noqa: E402  (room size + furniture count per difficulty)
+importlib.reload(er_layout)
+
 GENERATOR_CLASS = "BP_RoomGenerator_C"
 NOTE_CLASS = "BP_Note_C"
 CLUESPOT_BP = "/Game/EscapeRoom/Blueprints/BP_ClueSpot"
 SPOT_FOLDER = "ER/Generator/ClueSpots"
 DIFFICULTIES = ["Easy", "Medium", "Hard"]  # index = BP_RoomGenerator.Difficulty
 NOTES_PER_ROOM = [1, 2, 4]                 # how many pieces the code is split into
-SPOT_TAGS = ["ClueSpot", "ClueSpotMedium"]  # Medium also uses the ClueSpotMedium spots
+SPOT_TAGS = ["ClueSpot"]                    # + ClueSpot0/1/2: spots that exist on Easy/Medium/Hard (set by er_layout)
 
 actor_sys = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 editor_sys = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
@@ -64,30 +71,36 @@ def poster_note():
     return posters[0] if posters else None
 
 
-def clue_spots(include_medium=True):
-    tags = SPOT_TAGS if include_medium else SPOT_TAGS[:1]
-    return [a for a in level_actors() if any(unreal.Name(t) in a.tags for t in tags)]
+def clue_spots(difficulty=None):
+    """All clue spots, or only the ones that exist on a difficulty (their furniture is in that room)."""
+    tag = unreal.Name("ClueSpot" if difficulty is None else "ClueSpot%d" % difficulty)
+    return [a for a in level_actors() if tag in a.tags]
 
 
-def is_medium_spot(spot):
-    return unreal.Name("ClueSpotMedium") in spot.tags
+def spot_in(spot, difficulty):
+    return unreal.Name("ClueSpot%d" % difficulty) in spot.tags
 
 
 def spot_container(spot):
     for t in spot.tags:
-        if str(t) not in SPOT_TAGS:
+        if not str(t).startswith("ClueSpot"):
             return str(t)
     return "?"
 
 
-def medium_furniture():
-    return [a for a in level_actors() if unreal.Name("Medium") in a.tags]
+def furniture_in(difficulty):
+    return [a for a in level_actors() if unreal.Name("Furniture%d" % difficulty) in a.tags]
 
 
-def show_medium_in_editor(visible):
-    """Preview the layout: hide the Medium-only furniture (and its spots) in the editor viewport on Easy."""
-    for a in medium_furniture() + [s for s in clue_spots() if is_medium_spot(s)]:
-        a.set_is_temporarily_hidden_in_editor(not visible)
+def show_furniture_for(difficulty):
+    """Preview a difficulty in the editor: hide the furniture (and its spots) that isn't in that room."""
+    for a in level_actors():
+        if unreal.Name("Furniture") in a.tags:
+            hide = unreal.Name("Furniture%d" % difficulty) not in a.tags
+            a.set_is_temporarily_hidden_in_editor(hide)
+            for c in level_actors():
+                if c.get_attach_parent_actor() == a:
+                    c.set_is_temporarily_hidden_in_editor(hide)
 
 
 def note_text(note):
@@ -118,7 +131,7 @@ def furniture_overlaps(difficulty):
     """Pairs of visible furniture whose floor footprints overlap (furniture is shuffled into slots)."""
     boxes = []
     for a in level_actors():
-        if unreal.Name("Furniture") in a.tags and (difficulty >= 1 or unreal.Name("Medium") not in a.tags):
+        if unreal.Name("Furniture%d" % difficulty) in a.tags:
             o, e = a.get_actor_bounds(True)
             boxes.append((a.get_actor_label(), o.x - e.x, o.x + e.x, o.y - e.y, o.y + e.y))
     bad = []
@@ -142,8 +155,8 @@ def check_room(code, notes, spots, difficulty):
         return False, "note not on a clue spot"
     if len(set(s.get_actor_label() for s in spots)) != len(spots):
         return False, "two notes on the same spot"
-    if difficulty == 0 and any(is_medium_spot(s) for s in spots):
-        return False, "Easy note on Medium-only furniture"
+    if any(not spot_in(s, difficulty) for s in spots):
+        return False, "note on furniture that isn't in this room"
     full = "%04d" % code
     texts = [note_text(n) for n in notes]
     poster = poster_note()
@@ -260,6 +273,34 @@ class RoomTool(QtWidgets.QWidget):
         v.addLayout(h)
         root.addWidget(spot_box)
 
+        # --- Room layout (size + furniture count per difficulty)
+        lay_box = QtWidgets.QGroupBox("Room layout")
+        lg = QtWidgets.QGridLayout(lay_box)
+        for col, title in enumerate(["", "Width (cm)", "Depth (cm)", "Furniture"]):
+            lg.addWidget(QtWidgets.QLabel(title), 0, col)
+        self.lay_spins = []
+        for d, s in enumerate(er_layout.load_settings()):
+            lg.addWidget(QtWidgets.QLabel(DIFFICULTIES[d]), d + 1, 0)
+            row = []
+            for col, key in enumerate(["width", "depth", "furniture"]):
+                sp = QtWidgets.QSpinBox()
+                sp.setRange(*er_layout.LIMITS[key])
+                sp.setSingleStep(1 if key == "furniture" else 50)
+                sp.setValue(s[key])
+                lg.addWidget(sp, d + 1, col + 1)
+                row.append(sp)
+            self.lay_spins.append(row)
+        b_apply = QtWidgets.QPushButton("Apply layout")
+        b_apply.clicked.connect(self.on_apply_layout)
+        b_reset = QtWidgets.QPushButton("Defaults")
+        b_reset.clicked.connect(self.on_layout_defaults)
+        lg.addWidget(b_apply, 4, 0, 1, 2)
+        lg.addWidget(b_reset, 4, 2, 1, 2)
+        self.lay_info = QtWidgets.QLabel("")
+        self.lay_info.setWordWrap(True)
+        lg.addWidget(self.lay_info, 5, 0, 1, 4)
+        root.addWidget(lay_box)
+
         # --- Batch test
         batch_box = QtWidgets.QGroupBox("Batch test")
         bv = QtWidgets.QVBoxLayout(batch_box)
@@ -291,7 +332,7 @@ class RoomTool(QtWidgets.QWidget):
         self.on_generate()
 
     def on_difficulty(self, index):
-        show_medium_in_editor(index >= 1)
+        show_furniture_for(index)
         self.refresh_spots()
         self.on_generate()
 
@@ -329,9 +370,9 @@ class RoomTool(QtWidgets.QWidget):
     # ---- clue spot section
     def refresh_spots(self):
         self.spot_list.clear()
-        medium = self.difficulty.currentIndex() >= 1
-        for s in sorted(clue_spots(include_medium=medium), key=lambda a: a.get_actor_label()):
-            extra = "  (Medium)" if is_medium_spot(s) else ""
+        diff = self.difficulty.currentIndex()
+        for s in sorted(clue_spots(diff), key=lambda a: a.get_actor_label()):
+            extra = "" if spot_in(s, 0) else "  (Medium+)" if spot_in(s, 1) else "  (Hard)"
             item = QtWidgets.QListWidgetItem("%s   [%s]%s" % (s.get_actor_label(), spot_container(s), extra))
             item.setData(QtCore.Qt.UserRole, s.get_actor_label())
             self.spot_list.addItem(item)
@@ -366,6 +407,19 @@ class RoomTool(QtWidgets.QWidget):
             with unreal.ScopedEditorTransaction("Delete ClueSpot"):
                 actor_sys.destroy_actor(s)
         self.refresh_spots()
+
+    # ---- room layout section
+    def on_apply_layout(self):
+        settings = [{"width": r[0].value(), "depth": r[1].value(), "furniture": r[2].value()} for r in self.lay_spins]
+        with unreal.ScopedEditorTransaction("Apply room layout"):
+            lines = er_layout.apply_layout(settings)
+        self.lay_info.setText("Applied:\n" + "\n".join(lines))
+        self.on_difficulty(self.difficulty.currentIndex())
+
+    def on_layout_defaults(self):
+        for row, s in zip(self.lay_spins, er_layout.DEFAULTS):
+            for sp, key in zip(row, ["width", "depth", "furniture"]):
+                sp.setValue(s[key])
 
     # ---- batch section
     def on_batch(self):

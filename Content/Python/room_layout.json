@@ -1,0 +1,17 @@
+[
+  {
+    "width": 800,
+    "depth": 600,
+    "furniture": 3
+  },
+  {
+    "width": 1000,
+    "depth": 700,
+    "furniture": 5
+  },
+  {
+    "width": 1200,
+    "depth": 800,
+    "furniture": 7
+  }
+]
