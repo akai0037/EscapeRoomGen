@@ -5,7 +5,8 @@ Open it from the Unreal menu bar: Escape Room > Room Generator Tool,
 or in the Python console:  import er_tool; er_tool.show()
 
 What it does (all in the editor, no Play needed):
-  Difficulty - Easy (one note, full code) or Medium (extra furniture, code split over two notes)
+  Difficulty - Easy (one note, full code), Medium (extra furniture, code split over two notes)
+               or Hard (extra furniture, one digit per note, four notes)
   Generate   - calls BP_RoomGenerator.GenerateRoom(seed) on the RoomGenerator in the level
   Clear      - removes every BP_Note from the level
   Focus      - selects the generated note and points the viewport camera at it
@@ -34,7 +35,8 @@ GENERATOR_CLASS = "BP_RoomGenerator_C"
 NOTE_CLASS = "BP_Note_C"
 CLUESPOT_BP = "/Game/EscapeRoom/Blueprints/BP_ClueSpot"
 SPOT_FOLDER = "ER/Generator/ClueSpots"
-DIFFICULTIES = ["Easy", "Medium"]          # index = BP_RoomGenerator.Difficulty
+DIFFICULTIES = ["Easy", "Medium", "Hard"]  # index = BP_RoomGenerator.Difficulty
+NOTES_PER_ROOM = [1, 2, 4]                 # how many pieces the code is split into
 SPOT_TAGS = ["ClueSpot", "ClueSpotMedium"]  # Medium also uses the ClueSpotMedium spots
 
 actor_sys = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
@@ -87,8 +89,8 @@ def get_generator():
 
 
 def generate(seed, difficulty=0):
-    """Run the Blueprint generator at a difficulty (0 Easy, 1 Medium).
-    Returns (code, notes, spots) - one note on Easy, two on Medium - or raises."""
+    """Run the Blueprint generator at a difficulty (0 Easy, 1 Medium, 2 Hard).
+    Returns (code, notes, spots) - 1, 2 or 4 notes, sorted by digit position - or raises."""
     gen = get_generator()
     if gen is None:
         raise RuntimeError("No RoomGenerator in this level.")
@@ -121,7 +123,7 @@ def check_room(code, notes, spots, difficulty):
     clash = furniture_overlaps(difficulty)
     if clash:
         return False, "furniture overlaps: " + ", ".join(clash)
-    want = 1 if difficulty == 0 else 2
+    want = NOTES_PER_ROOM[difficulty]
     if len(notes) != want:
         return False, "%d note(s), expected %d" % (len(notes), want)
     if any(s is None for s in spots):
@@ -132,10 +134,10 @@ def check_room(code, notes, spots, difficulty):
         return False, "Easy note on Medium-only furniture"
     full = "%04d" % code
     texts = [note_text(n) for n in notes]
-    if difficulty == 0:
-        ok = texts[0] == full
-    else:
-        ok = texts[0] == full[:2] + "__" and texts[1] == "__" + full[2:]
+    # each note shows its piece of the code and "_" for the digits it hides: 21__ / __13, or 2___ / _1__ ...
+    size = 4 // want
+    expected = ["_" * (i * size) + full[i * size:(i + 1) * size] + "_" * (4 - (i + 1) * size) for i in range(want)]
+    ok = texts == expected
     return (ok, "") if ok else (False, "notes %s don't match code %s" % (texts, full))
 
 
@@ -359,7 +361,7 @@ class RoomTool(QtWidgets.QWidget):
         finally:
             QtWidgets.QApplication.restoreOverrideCursor()
             clear_notes()
-        per_room = 1 if diff == 0 else 2
+        per_room = NOTES_PER_ROOM[diff]
         lines = ["[%s] %d / %d rooms passed (no furniture overlap, %d note(s) on allowed spots, code adds up)"
                  % (DIFFICULTIES[diff], passed, n, per_room), ""]
         lines.append("Where the clues landed:")
