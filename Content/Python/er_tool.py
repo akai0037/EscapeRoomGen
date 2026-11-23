@@ -6,7 +6,7 @@ or in the Python console:  import er_tool; er_tool.show()
 
 What it does (all in the editor, no Play needed):
   Difficulty - Easy (one note, full code), Medium (extra furniture, code split over two notes)
-               or Hard (extra furniture, one digit per note, four notes)
+               or Hard (extra furniture, four notes like "@ = 7" plus a symbol-order poster on the painting)
   Generate   - calls BP_RoomGenerator.GenerateRoom(seed) on the RoomGenerator in the level
   Clear      - removes every BP_Note from the level
   Focus      - selects the generated note and points the viewport camera at it
@@ -50,6 +50,17 @@ def level_actors():
 
 def actors_of(class_name):
     return [a for a in level_actors() if a.get_class().get_name() == class_name]
+
+
+def is_poster(note):
+    """Hard mode's symbol-order poster is a BP_Note on the PosterSpot - not a clue note."""
+    parent = note.get_attach_parent_actor()
+    return parent is not None and unreal.Name("PosterSpot") in parent.tags
+
+
+def poster_note():
+    posters = [n for n in actors_of(NOTE_CLASS) if is_poster(n)]
+    return posters[0] if posters else None
 
 
 def clue_spots(include_medium=True):
@@ -97,7 +108,7 @@ def generate(seed, difficulty=0):
     gen.set_editor_property("Difficulty", int(difficulty))
     gen.call_method("GenerateRoom", (int(seed),))
     code = gen.get_editor_property("CurrentCode")
-    notes = sorted(actors_of(NOTE_CLASS), key=note_text)   # "12__" sorts before "__34"
+    notes = sorted([n for n in actors_of(NOTE_CLASS) if not is_poster(n)], key=note_text)   # "12__" sorts before "__34"
     spots = [n.get_attach_parent_actor() for n in notes]
     return code, notes, spots
 
@@ -134,7 +145,20 @@ def check_room(code, notes, spots, difficulty):
         return False, "Easy note on Medium-only furniture"
     full = "%04d" % code
     texts = [note_text(n) for n in notes]
-    # each note shows its piece of the code and "_" for the digits it hides: 21__ / __13, or 2___ / _1__ ...
+    poster = poster_note()
+    if difficulty == 2:
+        # Hard: notes read "@ = 7"; the poster lists the symbols in code order, e.g. "& % # @"
+        if poster is None:
+            return False, "no symbol poster"
+        order = note_text(poster).split()
+        pairs = dict(t.split(" = ", 1) for t in texts if " = " in t)
+        if len(order) != 4 or sorted(pairs) != sorted(order):
+            return False, "poster %s doesn't match note symbols %s" % (order, texts)
+        got = "".join(pairs[sym] for sym in order)
+        return (True, "") if got == full else (False, "notes+poster give %s, code is %s" % (got, full))
+    if poster is not None:
+        return False, "poster should only appear on Hard"
+    # each note shows its piece of the code and "_" for the digits it hides: 21__ / __13
     size = 4 // want
     expected = ["_" * (i * size) + full[i * size:(i + 1) * size] + "_" * (4 - (i + 1) * size) for i in range(want)]
     ok = texts == expected
@@ -279,6 +303,8 @@ class RoomTool(QtWidgets.QWidget):
             return
         self.last_notes, self.focus_i = notes, 0
         parts = ["%s @ %s" % (note_text(n), s.get_actor_label() if s else "?") for n, s in zip(notes, spots)]
+        if poster_note():
+            parts.append("poster: %s" % note_text(poster_note()))
         ok, why = check_room(code, notes, spots, diff)
         self.result.setText("Seed %d [%s]  ->  Code %04d\n%s%s" % (
             seed, DIFFICULTIES[diff], code, "\n".join(parts), "" if ok else "\nPROBLEM: " + why))
