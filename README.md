@@ -5,7 +5,7 @@ Research Project 1 — an Unreal Engine 5.8 tool that builds a new, solvable **w
 - **Engine:** Unreal Engine 5.8 (First Person template)
 - **Game logic:** Blueprints (`BP_RoomGenerator.GenerateRoom`)
 - **Editor tool:** Python + PySide6 panel (`Content/Python/er_tool.py`, `er_layout.py`)
-- **Video (1–3 min):** _add link here_
+- **Video (1–3 min):** [EscapeRoomGen.mp4 on Google Drive](https://drive.google.com/file/d/1i756jnqWHiE4OS5oX5MOyAYOiv6fvPzx/view?usp=sharing)
 
 ---
 
