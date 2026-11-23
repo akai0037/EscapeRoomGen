@@ -47,13 +47,19 @@ Level designers spend a lot of time hand-placing escape-room props and checking 
 
 ## What I learned
 
-_(draft — rewrite in your own words)_
+- **A seed makes randomness testable.** At first I thought "random" just meant different every time. But if every choice comes from one `RandomStream`, the same seed always builds the same room. That changed how I debugged: when something looked wrong, I wrote down the seed and could rebuild that exact room again. It's also what made the batch test possible.
 
-- **Seeded randomness makes a generator testable.** Using one `RandomStream` for every decision means a seed always rebuilds the same room, so a bug report is just a seed number, and the batch test can check hundreds of rooms automatically.
-- **"Solvable" has to be checked, not assumed.** Several real bugs (a note stuck inside a drawer's front panel, notes landing on furniture that was hidden on Easy, clue spots that stopped moving with the drawer after a Blueprint recompile) were only found because the batch test and play-testing disagreed with what I expected.
-- **Tags are a simple, flexible way to drive a generator.** `Furniture<d>`, `FurnitureSlot<d>` and `ClueSpot<d>` tags let one Blueprint handle every difficulty and room size, and let the editor tool change the room without touching the Blueprint.
-- **Data in the editor, logic in the Blueprint.** The Python tool precomputes room layouts into arrays on the generator; the Blueprint only applies them. That kept the runtime graph small and made the layout fully customisable.
-- **Keeping a big Blueprint readable** — removing unused nodes and grouping the graph into commented sections that follow the order the room is built.
+- **I can't just assume the room is solvable. I have to check it.** I thought my logic was right, but the batch test and play-testing kept finding problems I didn't expect: a note stuck inside the drawer's front panel, notes showing up on furniture that wasn't even in the Easy room, and drawer clue spots that stopped moving with the drawer after I recompiled the Blueprint. Now I think the checking tool is as important as the generator itself.
+
+- **Tags are a simple way to control a lot of things.** Instead of making a separate Blueprint for each difficulty, I tagged actors (`Furniture<d>`, `FurnitureSlot<d>`, `ClueSpot<d>`). One `GenerateRoom` graph can then handle every difficulty and room size, and the editor panel can change the room without me opening the Blueprint.
+
+- **Do the heavy work in the editor, keep the game logic small.** The Python panel calculates the room layouts ahead of time and saves them as arrays on the generator. In the game, the Blueprint only applies them. This kept my Blueprint graph much shorter and easier to follow.
+
+- **Scope is a design decision too.** I wanted real furniture models, so I tried two Fab packs. Together they were about 3.4 GB, much more than GitHub LFS's 1 GB free limit. So I kept the room white-box and wrote a guide for swapping models in later. The generator is the real point of the project, and grey boxes actually make the layout and puzzle flow easier to see.
+
+- **Tools can break each other.** Compiling a Blueprint while my PySide panel was open crashed Unreal. I didn't fix it yet, but I learned that Python and Qt hold references to editor objects, and those can break when a Blueprint recompiles. For now I close the panel first.
+
+- **Keeping a big Blueprint readable.** As `GenerateRoom` grew, it got hard to follow. I deleted unused nodes and grouped the graph into commented sections in the same order the room gets built, so I (and anyone else) can read it from left to right.
 
 ## What doesn't work yet
 
