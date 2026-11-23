@@ -13,6 +13,15 @@ Research Project 1 — an Unreal Engine 5.8 tool that builds a new, solvable **w
 
 Level designers spend a lot of time hand-placing escape-room props and checking that the puzzle can still be solved. I wanted a generator that does the boring part — lay out a room, hide the clues, make sure the code adds up — so a designer can press a button, get a playable white-box room, test it, and only then spend time on art. The rooms stay deliberately simple (grey boxes) so the layout and puzzle flow are easy to read, and any piece can be swapped for a real model later (see [Swapping in your own models](#swapping-in-your-own-models)).
 
+## How it changed from the proposal
+
+My proposal was a random escape-room generator in Unreal, built with Blueprints. That core idea stayed the same, but a few things changed along the way:
+
+- **It became a white-box generator.** I first planned to use real furniture models, so I tried two Fab packs. Together they were about 3.4 GB, much more than GitHub LFS's 1 GB free limit. I decided to keep simple grey-box furniture and focus on the generator itself, and I wrote a guide for swapping in real models later.
+- **I added an editor tool.** Generating only when the game starts made it hard to see where the clues went or to test many rooms. So I built a Python/PySide panel inside Unreal, like the tools I made for Maya. It can generate any seed in the editor, change room size and furniture count, edit clue spots, and batch-test hundreds of rooms.
+- **Difficulty levels shape the puzzle.** I split the game into Easy, Medium and Hard. I built Medium first (two notes), then Easy (one note) and Hard (four notes). Room size and furniture count also grow with difficulty, and they can be changed in the panel.
+- **Hard got a symbol-order poster.** For Hard's extra puzzle I considered math notes and a key-and-lock box, and chose a symbol-order poster: the notes say `symbol = digit`, and the poster tells you the order. Sometimes the poster is hidden behind a sliding painting.
+
 ## What I made
 
 **In the game**
