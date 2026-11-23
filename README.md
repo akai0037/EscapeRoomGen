@@ -22,8 +22,8 @@ Level designers spend a lot of time hand-placing escape-room props and checking 
 
 **What the generator does (`GenerateRoom`, one seed → one room)**
 1. Clears the last room and seeds a random stream, then rolls a 4-digit code.
-2. **Room size per difficulty** — moves the walls, floor, ceiling, door and painting to that difficulty's layout (defaults: Easy 8 × 6 m, Medium 10 × 7 m, Hard 12 × 8 m).
-3. **Furniture shuffle** — places that difficulty's furniture (3 / 5 / 7 pieces) into random free slots along the walls, so no two rooms look the same and pieces never overlap.
+2. **Room size per difficulty** — moves the walls, floor, ceiling and door to that difficulty's layout (defaults: Easy 8 × 6 m, Medium 10 × 7 m, Hard 12 × 8 m).
+3. **Furniture shuffle** — places that difficulty's furniture (3 / 5 / 7 pieces) into random free slots along the walls, so no two rooms look the same and pieces never overlap. **Paintings count as furniture:** each hangs on the wall above its own slot, every room has the painting that can hide the Hard poster, and bigger rooms add up to two more paintings (they slide aside too, but hide nothing — decoys on Hard).
 4. **Clues** — picks clue spots only on furniture that is actually in the room:
    - **Easy:** one note with the whole code.
    - **Medium:** two notes, first half / second half (`21__`, `__13`).
@@ -31,7 +31,7 @@ Level designers spend a lot of time hand-placing escape-room props and checking 
 
 **Editor panel (Escape Room → Room Generator Tool)**
 - Generate any seed / difficulty in the editor and see where every clue went; *Focus on clue* jumps the camera to it.
-- **Room layout:** width, depth and furniture count for each difficulty. *Apply layout* recomputes walls, door, painting and furniture slots (one slot per 3 m of wall) and copies extra furniture when a room needs more.
+- **Room layout:** width, depth and furniture count for each difficulty. *Apply layout* recomputes walls, door and furniture slots (one slot per 3 m of wall) and copies extra furniture when a room needs more. The furniture count includes the paintings and can't exceed the number of slots — if you ask for more, the panel says how many fit and that the room needs to be bigger.
 - **Clue spots:** list, add (on the selected actor) and delete the places notes can appear.
 - **Batch test:** generates N seeds and checks every room — no furniture overlap or furniture outside the walls, the right number of notes, notes only on furniture that is in the room, and the notes (+ poster on Hard) really add up to the door code. All three difficulties pass 100 / 100.
 

@@ -10,6 +10,11 @@ The settings live in room_layout.json next to this file. apply_layout() turns th
       ClueSpot<d>       clue spots on placed furniture (and on the floor)
   * extra furniture (copies of the shelf / drawer / desk, with their clue spots) and extra slots
     when a room needs more than the level has.
+
+Paintings count as furniture: each hangs on an invisible Painting_Mount_<n> that is shuffled into a wall slot like
+any other piece (the painting hangs above the slot). Mount 1 always comes first, so every room has the painting with
+the Hard poster; mounts 2 and 3 join at pool positions 6 and 10. A mount that isn't used on a difficulty is parked
+under the floor by the layout step (hiding an actor in game does not hide the painting attached to it).
 """
 import json
 import os
@@ -25,7 +30,10 @@ DEFAULTS = [{"width": 800, "depth": 600, "furniture": 3},
 LIMITS = {"width": (600, 2000), "depth": (500, 1600), "furniture": (1, 16)}
 SLOT_SPACING = 300          # one furniture slot per 3 m of wall
 WALL_GAP = 25               # furniture slot distance from the wall (cm)
+CORNER = 70                 # side-wall slots start this far from the back wall (furniture there is ~60 cm deep)
 POOL_ORDER = ["BP_DeskSet_1", "BP_Shelf_1", "BP_Drawer_1", "BP_Drawer_2", "BP_Shelf_2"]
+PAINTINGS = ["Painting_Mount_1", "Painting_Mount_2", "Painting_Mount_3"]
+PAINTING_AT = [0, 5, 9]     # where each painting joins the furniture pool (pool order = which pieces a count uses)
 COPY_FROM = ["BP_Shelf_1", "BP_Drawer_1", "BP_DeskSet_1"]   # what extra furniture is copied from, in turn
 PARKED = unreal.Vector(0, 0, -2000)                           # unused slots are parked under the floor
 
@@ -78,8 +86,6 @@ def room_parts(width, depth):
         "Outside_Floor": xf(hw + 100, 0, -10, sx=1.8, sy=2.0, sz=0.2),
         "Outside_Light": xf(hw + 120, 0, 250),
         "Light_Ceiling": xf(0, 0, 270),
-        "BP_Painting": xf(-(hw - 8), -27, 108, yaw=90),
-        "Spot_PosterHidden": xf(-(hw - 1), 0, 170, pitch=-90),
     }
 
 
@@ -90,11 +96,13 @@ def slot_spots(width, depth):
     k = max(1, int(depth // SLOT_SPACING))
     for i in range(k):
         out.append(xf(-(hw - WALL_GAP), -hd + (i + 0.5) * depth / k, 0, yaw=0))
+    # side walls: keep clear of the back corners, where a back-wall piece already reaches (CORNER cm)
     k = max(1, int(width // SLOT_SPACING))
+    run = width - CORNER
     for i in range(k):
-        out.append(xf(-hw + (i + 0.5) * width / k, hd - WALL_GAP, 0, yaw=-90))
+        out.append(xf(-hw + CORNER + (i + 0.5) * run / k, hd - WALL_GAP, 0, yaw=-90))
     for i in range(k):
-        out.append(xf(-hw + (i + 0.5) * width / k, -(hd - WALL_GAP), 0, yaw=90))
+        out.append(xf(-hw + CORNER + (i + 0.5) * run / k, -(hd - WALL_GAP), 0, yaw=90))
     return out
 
 
@@ -107,6 +115,27 @@ def children_of(actor):
     return [a for a in actor_sys.get_all_level_actors() if a.get_attach_parent_actor() == actor]
 
 
+def descendants(actor):
+    out, todo = [], [actor]
+    while todo:
+        kids = children_of(todo.pop())
+        out += kids
+        todo += kids
+    return out
+
+
+def is_painting(actor):
+    return actor.get_actor_label().startswith("Painting_Mount")
+
+
+def with_paintings(furniture, mounts):
+    pool = list(furniture)
+    for at, m in zip(PAINTING_AT, mounts):
+        if at <= len(pool):
+            pool.insert(at, m)
+    return pool
+
+
 def set_tags(actor, keep_prefixes, add):
     """Replace the per-difficulty tags of an actor, keeping its other tags."""
     tags = [t for t in actor.tags if not any(str(t).startswith(p) for p in keep_prefixes)]
@@ -116,12 +145,14 @@ def set_tags(actor, keep_prefixes, add):
 def furniture_pool(count_needed):
     """The furniture actors in placement order, copying pieces (with their clue spots) if there are too few."""
     labels = by_label()
+    mounts = [labels[l] for l in PAINTINGS if l in labels]
     pool = [labels[l] for l in POOL_ORDER if l in labels]
     extra = sorted([a for a in actor_sys.get_all_level_actors()
-                    if unreal.Name("Furniture") in a.tags and a not in pool], key=lambda a: a.get_actor_label())
+                    if unreal.Name("Furniture") in a.tags and a not in pool and not is_painting(a)],
+                   key=lambda a: a.get_actor_label())
     pool += extra
     i = 0
-    while len(pool) < count_needed:
+    while len(with_paintings(pool, mounts)) < count_needed:
         src = labels[COPY_FROM[i % len(COPY_FROM)]]
         group = [src] + children_of(src)
         copies = actor_sys.duplicate_actors(group, None, unreal.Vector(0, 0, 0))
@@ -131,7 +162,7 @@ def furniture_pool(count_needed):
             cp.set_folder_path(orig.get_folder_path())
         pool.append(copies[0])
         i += 1
-    return pool
+    return with_paintings(pool, mounts)
 
 
 def slot_pool(count_needed):
@@ -164,6 +195,49 @@ def fix_drawer_spots():
                                  unreal.AttachmentRule.KEEP_WORLD, False)
 
 
+# Each painting, in its mount's frame (x = out of the wall, the mount sits 25 cm from the wall): the sliding box of
+# BP_Painting is the frame; the canvas sits on its front; the poster spot sits on the canvas, facing the room.
+PAINTING_PARTS = {
+    "BP_Painting": (unreal.Vector(-17, -27, 108), unreal.Rotator(roll=0, pitch=0, yaw=90), unreal.Vector(1, 1, 1)),
+    "Painting_Frame": (unreal.Vector(-17, 0, 170), unreal.Rotator(roll=0, pitch=0, yaw=90), unreal.Vector(0.9, 0.04, 0.7)),
+    "Painting_Canvas": (unreal.Vector(-14.5, 0, 170), unreal.Rotator(roll=0, pitch=0, yaw=90), unreal.Vector(0.8, 0.01, 0.6)),
+    "Spot_Poster": (unreal.Vector(-13.5, 0, 170), unreal.Rotator(roll=0, pitch=-90, yaw=0), unreal.Vector(1, 1, 1)),
+}
+
+
+def fix_paintings():
+    """Re-hang every painting on its mount: frame, canvas and poster spot ride on the sliding 'Drawer' box.
+    Recompiling BP_Painting can snap or re-attach them (like the drawer spots), so this runs on every Apply layout."""
+    K, D = unreal.AttachmentRule.KEEP_WORLD, unreal.DetachmentRule.KEEP_WORLD
+    labels = by_label()
+    for name in PAINTINGS:
+        mount = labels.get(name)
+        if mount is None:
+            continue
+        mt = mount.get_actor_transform()
+        paintings = [a for a in children_of(mount) if a.get_class().get_name() == "BP_Painting_C"]
+        if not paintings:
+            continue
+        painting = paintings[0]
+        parts = children_of(painting)
+
+        def place(actor, key):
+            loc, rot, scale = PAINTING_PARTS[key]
+            world = unreal.MathLibrary.compose_transforms(unreal.Transform(loc, rot, scale), mt)
+            actor.set_actor_transform(world, False, True)
+
+        for p in parts:
+            p.detach_from_actor(D, D, D)
+        place(painting, "BP_Painting")
+        slider = [c for c in painting.get_components_by_class(unreal.SceneComponent) if c.get_name() == "Drawer"][0]
+        for p in parts:
+            key = next((k for k in ("Painting_Frame", "Painting_Canvas", "Spot_Poster") if p.get_actor_label().startswith(k)), None)
+            if key:
+                p.root_component.set_mobility(unreal.ComponentMobility.MOVABLE)
+                place(p, key)
+            p.attach_to_component(slider, unreal.Name(), K, K, K, False)
+
+
 # ---------------------------------------------------------------- apply
 def apply_layout(settings=None):
     """Write the room sizes and furniture counts into the level. Returns a short report."""
@@ -178,6 +252,11 @@ def apply_layout(settings=None):
     for i, piece in enumerate(pool):
         set_tags(piece, ["Furniture", "Medium"], ["Furniture"] + ["Furniture%d" % d for d in range(3) if i < counts[d]])
         piece.set_actor_hidden_in_game(False)
+    mounts = [p for p in pool if is_painting(p)]
+    for m in mounts:
+        for a in [m] + descendants(m):
+            if a.root_component:
+                a.root_component.set_mobility(unreal.ComponentMobility.MOVABLE)
     placed = [set(pool[:counts[d]]) for d in range(3)]
     for spot in actor_sys.get_all_level_actors():
         if not any(str(t).startswith("ClueSpot") for t in spot.tags):
@@ -195,21 +274,32 @@ def apply_layout(settings=None):
     for a in room_actors:
         if a.root_component:
             a.root_component.set_mobility(unreal.ComponentMobility.MOVABLE)   # walls move when the game starts
-    layout_actors = room_actors + slots
+    layout_actors = room_actors + slots + mounts
     transforms = []
     for d in range(3):
         for a in room_actors:
             transforms.append(parts[d][a.get_actor_label()])
         for j in range(len(slots)):
             transforms.append(slots_per[d][j] if j < len(slots_per[d]) else xf(PARKED.x, PARKED.y, PARKED.z))
+        for m in mounts:   # used: anywhere (the shuffle moves it into a slot); unused: parked under the floor
+            used = unreal.Name("Furniture%d" % d) in m.tags
+            transforms.append(slots_per[d][0] if used else xf(PARKED.x, PARKED.y, PARKED.z))
     fix_drawer_spots()
+    fix_paintings()
     gen = [a for a in actor_sys.get_all_level_actors() if a.get_class().get_name() == "BP_RoomGenerator_C"][0]
     gen.set_editor_property("LayoutActors", layout_actors)
     gen.set_editor_property("LayoutTransforms", transforms)
     save_settings(settings)
     unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).save_current_level()
-    return ["%s: %d x %d cm, %d furniture (%d slots)" % (DIFFICULTIES[d], s["width"], s["depth"], counts[d], len(slots_per[d]))
-            for d, s in enumerate(settings)]
+    lines = []
+    for d, s in enumerate(settings):
+        pics = sum(1 for i, p in enumerate(pool) if i < counts[d] and is_painting(p))
+        line = "%s: %d x %d cm, %d furniture incl. %d painting%s (%d slots)" % (
+            DIFFICULTIES[d], s["width"], s["depth"], counts[d], pics, "" if pics == 1 else "s", len(slots_per[d]))
+        if s["furniture"] > counts[d]:
+            line += "\n    asked for %d, only %d fit - make the room bigger for more" % (s["furniture"], counts[d])
+        lines.append(line)
+    return lines
 
 
 def preview(difficulty):

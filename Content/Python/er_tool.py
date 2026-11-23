@@ -98,9 +98,8 @@ def show_furniture_for(difficulty):
         if unreal.Name("Furniture") in a.tags:
             hide = unreal.Name("Furniture%d" % difficulty) not in a.tags
             a.set_is_temporarily_hidden_in_editor(hide)
-            for c in level_actors():
-                if c.get_attach_parent_actor() == a:
-                    c.set_is_temporarily_hidden_in_editor(hide)
+            for c in er_layout.descendants(a):      # a painting's frame hangs two levels down
+                c.set_is_temporarily_hidden_in_editor(hide)
 
 
 def note_text(note):
