@@ -23,13 +23,14 @@ Level designers spend a lot of time hand-placing escape-room props and checking 
 - Start screen, number-lock door and win screen work.
 
 **What changed, and why**
-- **One puzzle that scales, instead of three puzzle types.** I went deeper on the number lock instead of building light/color order and hidden key. Easy, Medium and Hard split the code into 1, 2 or 4 notes, and Hard adds a symbol-order poster that is sometimes hidden behind a sliding painting. Each new puzzle type needs its own interaction and its own solvability check, and I wanted every room to be checked, not just look random.
-- **No hidden key.** I considered a key-and-lock box for Hard but chose the poster. A key needs picking up and an inventory, and it is exactly the dead-end risk I wrote about (a key locked inside the box it opens).
+- **Puzzle type became its own choice.** At first I went deeper on the number lock only (Easy, Medium and Hard split the code into 1, 2 or 4 notes, and Hard had a symbol-order poster). In the last week I made the puzzle type a separate option next to difficulty: **Number**, **Symbol**, **Color** and **Key**. Every type ends in the same number-lock door, so one solvability check covers all of them.
+- **Color is a colour-order puzzle, not lights.** Instead of lights you switch on in order, the colour puzzle uses notes like `RED = 21` printed in red plus a poster with the colour order. It reuses the symbol system, so I could test it the same way.
+- **The key puzzle avoids the dead end by design.** One note goes into a lock box and the key is placed exactly where that note would have been, so the key can never end up inside the box. There is no inventory: picking up the key unlocks the box directly.
 - **The room itself is generated too.** This wasn't in my proposal: room size and furniture layout change with difficulty, so rooms look different, not only the clues.
 - **I added an editor tool.** Generating only at play time made it hard to see where clues went or to test many rooms, so I built a Python/PySide panel in Unreal, like the tools I made for Maya.
 - **It became a white-box generator.** I tried two Fab furniture packs, but together they were about 3.4 GB, much more than GitHub LFS's 1 GB free limit. I kept grey-box furniture and wrote a guide for swapping in real models later.
 
-**Not done from the proposal:** the light/color order and hidden-key puzzles, chaining puzzles so one unlocks the next, a timer, sound, and lighting polish (see *What doesn't work yet* and *Next steps*).
+**Not done from the proposal:** a light-switching puzzle, chaining several different puzzles in one room, a timer, sound, and lighting polish (see *What doesn't work yet* and *Next steps*).
 
 ## What I made
 
@@ -42,16 +43,23 @@ Level designers spend a lot of time hand-placing escape-room props and checking 
 1. Clears the last room and seeds a random stream, then rolls a 4-digit code.
 2. **Room size per difficulty** — moves the walls, floor, ceiling and door to that difficulty's layout (defaults: Easy 8 × 6 m, Medium 10 × 7 m, Hard 12 × 8 m).
 3. **Furniture shuffle** — places that difficulty's furniture (3 / 5 / 7 pieces) into random free slots along the walls, so no two rooms look the same and pieces never overlap. **Paintings count as furniture:** each hangs on the wall above its own slot, every room has the painting that can hide the Hard poster, and bigger rooms add up to two more paintings (they slide aside too, but hide nothing — decoys on Hard).
-4. **Clues** — picks clue spots only on furniture that is actually in the room:
-   - **Easy:** one note with the whole code.
-   - **Medium:** two notes, first half / second half (`21__`, `__13`).
-   - **Hard:** four notes that read `symbol = digit` (e.g. `@ = 7`) plus a **symbol-order poster** (e.g. `& # % @`, one of 24 orders). By seed, the poster is either on the painting or **hidden behind it** — slide the painting aside with E to find it.
+4. **Clues** — picks clue spots only on furniture that is actually in the room. Difficulty sets how many notes the code is split into (Easy 1, Medium 2, Hard 4); the **puzzle type** (`PuzzleType`, chosen in the editor panel) sets what they look like:
+
+   | Puzzle | Notes | Extra | Difficulties |
+   |---|---|---|---|
+   | **Number** | `21__`, `__13` (Hard: `2___` … `___3`) | — | all |
+   | **Symbol** | `@ = 21` | **symbol-order poster** (e.g. `& # % @`, one of 24 orders), on the painting or **hidden behind it** — slide the painting aside with E | Medium, Hard |
+   | **Color** | `RED = 21`, printed in that colour | colour-order poster (e.g. `GREEN RED BLUE ORANGE`) | Medium, Hard |
+   | **Key** | number notes, but one is in a **lock box** in the middle of the room | the **key** lies where that note would have been; pick it up with E, then open the box with E | all |
+
+   Symbol and Color need at least two notes to put in order, so they are not offered on Easy.
+   The text comes from small Blueprint functions on the generator: `ClueText`, `ClueColor`, `Decorate` (symbols → colour words) and `UsesPoster`; the key puzzle is `ApplyKeyPuzzle`.
 
 **Editor panel (Escape Room → Room Generator Tool)**
-- Generate any seed / difficulty in the editor and see where every clue went; *Focus on clue* jumps the camera to it.
+- Generate any seed / difficulty / puzzle type in the editor and see where every clue (and the key) went; *Focus on clue* jumps the camera to it. The puzzle type you pick is also what the game uses when you press Play.
 - **Room layout:** width, depth and furniture count for each difficulty. *Apply layout* recomputes walls, door and furniture slots (one slot per 3 m of wall) and copies extra furniture when a room needs more. The furniture count includes the paintings and can't exceed the number of slots — if you ask for more, the panel says how many fit and that the room needs to be bigger.
 - **Clue spots:** list, add (on the selected actor) and delete the places notes can appear.
-- **Batch test:** generates N seeds and checks every room — no furniture overlap or furniture outside the walls, the right number of notes, notes only on furniture that is in the room, and the notes (+ poster on Hard) really add up to the door code. All three difficulties pass 100 / 100.
+- **Batch test:** generates N seeds and checks every room — no furniture overlap or furniture outside the walls, the right number of notes, notes only on furniture that is in the room, and the notes (+ poster) really add up to the door code. For Color it also checks each note is printed in its colour; for Key it checks exactly one note is in the box and the key is on a normal clue spot in the room (never inside the box). Every difficulty × puzzle combination passes 100 / 100.
 
 ## How to run
 
@@ -90,7 +98,8 @@ Level designers spend a lot of time hand-placing escape-room props and checking 
 
 ## Next steps
 
-- The puzzle types from my proposal: a **light/color order** puzzle and a **hidden key** for a locked chest, chained so one puzzle unlocks the next (and checked by the batch test so the key is never locked inside its own chest).
+- Chain different puzzle types in one room (e.g. the colour poster is locked in the key box), and a light-switching puzzle from my proposal.
+- Move the lock box to a random free spot instead of the middle of the room.
 - A **clock** whose hands show part of the code.
 - Room shapes beyond rectangles (L-shaped rooms, two connected rooms).
 - Lights that scale with room size; desk lamp attached to the desk.
@@ -153,6 +162,7 @@ Fab / Marketplace packs are huge (the two packs I tried were ~3.4 GB together; G
 | `Content/EscapeRoom/Maps/Lvl_EscapeRoom` | The room level |
 | `Content/EscapeRoom/Blueprints/BP_RoomGenerator` | The generator (`GenerateRoom`) |
 | `Content/EscapeRoom/Blueprints/BP_Shelf`, `BP_DeskSet`, `BP_Drawer`, `BP_Painting`, `BP_Door`, `BP_Note`, `BP_ClueSpot`, `BP_FurnitureSlot` | Furniture, interactables and helpers |
+| `Content/EscapeRoom/Blueprints/BP_LockBox`, `BP_Key` | Key puzzle: the box opens with E only after the key was picked up |
 | `Content/EscapeRoom/UI/WBP_StartPanel`, `WBP_Keypad`, `WBP_Win` | Start screen, door keypad, win screen |
 | `Content/Python/er_tool.py` | Editor panel (generate, clue spots, room layout, batch test) |
 | `Content/Python/er_layout.py`, `room_layout.json` | Room size / furniture count per difficulty |
