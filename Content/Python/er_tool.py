@@ -6,7 +6,8 @@ or in the Python console:  import er_tool; er_tool.show()
 
 What it does (all in the editor, no Play needed):
   Difficulty - Easy (one note, full code), Medium (extra furniture, code split over two notes)
-               or Hard (extra furniture, four notes like "@ = 7" plus a symbol-order poster on the painting)
+               or Hard (extra furniture, four notes like "@ = 7" plus a symbol-order poster -
+               on the painting or, on some seeds, behind it: slide the painting aside with E)
   Generate   - calls BP_RoomGenerator.GenerateRoom(seed) on the RoomGenerator in the level
   Clear      - removes every BP_Note from the level
   Focus      - selects the generated note and points the viewport camera at it
@@ -55,7 +56,7 @@ def actors_of(class_name):
 def is_poster(note):
     """Hard mode's symbol-order poster is a BP_Note on the PosterSpot - not a clue note."""
     parent = note.get_attach_parent_actor()
-    return parent is not None and unreal.Name("PosterSpot") in parent.tags
+    return parent is not None and any(str(t).startswith("PosterSpot") for t in parent.tags)
 
 
 def poster_note():
@@ -304,7 +305,9 @@ class RoomTool(QtWidgets.QWidget):
         self.last_notes, self.focus_i = notes, 0
         parts = ["%s @ %s" % (note_text(n), s.get_actor_label() if s else "?") for n, s in zip(notes, spots)]
         if poster_note():
-            parts.append("poster: %s" % note_text(poster_note()))
+            p = poster_note()
+            where = "behind the painting" if "Hidden" in p.get_attach_parent_actor().get_actor_label() else "on the painting"
+            parts.append("poster: %s  (%s)" % (note_text(p), where))
         ok, why = check_room(code, notes, spots, diff)
         self.result.setText("Seed %d [%s]  ->  Code %04d\n%s%s" % (
             seed, DIFFICULTIES[diff], code, "\n".join(parts), "" if ok else "\nPROBLEM: " + why))
