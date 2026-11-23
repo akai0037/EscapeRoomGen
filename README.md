@@ -24,7 +24,7 @@ Level designers spend a lot of time hand-placing escape-room props and checking 
 
 **What changed, and why**
 - **Puzzle type became its own choice.** At first I went deeper on the number lock only (Easy, Medium and Hard split the code into 1, 2 or 4 notes, and Hard had a symbol-order poster). In the last week I made the puzzle type a separate option next to difficulty: **Number**, **Symbol**, **Color** and **Key**. Every type ends in the same number-lock door, so one solvability check covers all of them.
-- **Color is a colour-order puzzle, not lights.** Instead of lights you switch on in order, the colour puzzle uses notes like `RED = 21` printed in red plus a poster with the colour order. It reuses the symbol system, so I could test it the same way.
+- **Color is a colour-order puzzle, not lights.** Instead of lights you switch on in order, the colour puzzle uses notes that show only digits printed in a colour (e.g. `21` in red) plus a poster with the colour order. It reuses the symbol system, so I could test it the same way.
 - **The key puzzle avoids the dead end by design.** One note goes into a lock box and the key is placed exactly where that note would have been, so the key can never end up inside the box. There is no inventory: picking up the key unlocks the box directly.
 - **The room itself is generated too.** This wasn't in my proposal: room size and furniture layout change with difficulty, so rooms look different, not only the clues.
 - **I added an editor tool.** Generating only at play time made it hard to see where clues went or to test many rooms, so I built a Python/PySide panel in Unreal, like the tools I made for Maya.
@@ -49,7 +49,7 @@ Level designers spend a lot of time hand-placing escape-room props and checking 
    |---|---|---|---|
    | **Number** | `21__`, `__13` (Hard: `2___` … `___3`) | — | all |
    | **Symbol** | `@ = 21` | **symbol-order poster** (e.g. `& # % @`, one of 24 orders), on the painting or **hidden behind it** — slide the painting aside with E | Medium, Hard |
-   | **Color** | `RED = 21`, printed in that colour | colour-order poster (e.g. `GREEN RED BLUE ORANGE`) | Medium, Hard |
+   | **Color** | just the digits, printed in a colour (e.g. `21` in red) | colour-order poster (e.g. `GREEN RED BLUE ORANGE`) | Medium, Hard |
    | **Key** | number notes, but one is in a **lock box** in the middle of the room | the **key** lies where that note would have been; pick it up with E, then open the box with E | all |
 
    Symbol and Color need at least two notes to put in order, so they are not offered on Easy.
@@ -59,7 +59,7 @@ Level designers spend a lot of time hand-placing escape-room props and checking 
 - Generate any seed / difficulty / puzzle type in the editor and see where every clue (and the key) went; *Focus on clue* jumps the camera to it. The puzzle type you pick is also what the game uses when you press Play.
 - **Room layout:** width, depth and furniture count for each difficulty. *Apply layout* recomputes walls, door and furniture slots (one slot per 3 m of wall) and copies extra furniture when a room needs more. The furniture count includes the paintings and can't exceed the number of slots — if you ask for more, the panel says how many fit and that the room needs to be bigger.
 - **Clue spots:** list, add (on the selected actor) and delete the places notes can appear.
-- **Batch test:** generates N seeds and checks every room — no furniture overlap or furniture outside the walls, the right number of notes, notes only on furniture that is in the room, and the notes (+ poster) really add up to the door code. For Color it also checks each note is printed in its colour; for Key it checks exactly one note is in the box and the key is on a normal clue spot in the room (never inside the box). Every difficulty × puzzle combination passes 100 / 100.
+- **Batch test:** generates N seeds and checks every room — no furniture overlap or furniture outside the walls, the right number of notes, notes only on furniture that is in the room, and the notes (+ poster) really add up to the door code. For Color it also checks each note is plain digits in one of the four colours; for Key it checks exactly one note is in the box and the key is on a normal clue spot in the room (never inside the box). Every difficulty × puzzle combination passes 100 / 100.
 
 ## How to run
 
