@@ -15,12 +15,21 @@ Level designers spend a lot of time hand-placing escape-room props and checking 
 
 ## How it changed from the proposal
 
-My proposal was a random escape-room generator in Unreal, built with Blueprints. That core idea stayed the same, but a few things changed along the way:
+**What I proposed:** a Blueprint system in UE5 that builds a new, solvable escape room every time you play, with 2–3 puzzle types (number lock, light/color order, hidden key) chained so one puzzle unlocks the next, plus a start screen, timer, sound and lighting polish.
 
-- **It became a white-box generator.** I first planned to use real furniture models, so I tried two Fab packs. Together they were about 3.4 GB, much more than GitHub LFS's 1 GB free limit. I decided to keep simple grey-box furniture and focus on the generator itself, and I wrote a guide for swapping in real models later.
-- **I added an editor tool.** Generating only when the game starts made it hard to see where the clues went or to test many rooms. So I built a Python/PySide panel inside Unreal, like the tools I made for Maya. It can generate any seed in the editor, change room size and furniture count, edit clue spots, and batch-test hundreds of rooms.
-- **Difficulty levels shape the puzzle.** I split the game into Easy, Medium and Hard. I built Medium first (two notes), then Easy (one note) and Hard (four notes). Room size and furniture count also grow with difficulty, and they can be changed in the panel.
-- **Hard got a symbol-order poster.** For Hard's extra puzzle I considered math notes and a key-and-lock box, and chose a symbol-order poster: the notes say `symbol = digit`, and the poster tells you the order. Sometimes the poster is hidden behind a sliding painting.
+**What stayed the same**
+- Every play is a new room, and the answer (the door code) and clue positions are randomized each time.
+- The riskiest part of my proposal was making sure every room is actually solvable. That part is done: the batch test generates hundreds of seeds and checks that the clues really add up to the door code, every note is on furniture that is in the room, and nothing overlaps.
+- Start screen, number-lock door and win screen work.
+
+**What changed, and why**
+- **One puzzle that scales, instead of three puzzle types.** I went deeper on the number lock instead of building light/color order and hidden key. Easy, Medium and Hard split the code into 1, 2 or 4 notes, and Hard adds a symbol-order poster that is sometimes hidden behind a sliding painting. Each new puzzle type needs its own interaction and its own solvability check, and I wanted every room to be checked, not just look random.
+- **No hidden key.** I considered a key-and-lock box for Hard but chose the poster. A key needs picking up and an inventory, and it is exactly the dead-end risk I wrote about (a key locked inside the box it opens).
+- **The room itself is generated too.** This wasn't in my proposal: room size and furniture layout change with difficulty, so rooms look different, not only the clues.
+- **I added an editor tool.** Generating only at play time made it hard to see where clues went or to test many rooms, so I built a Python/PySide panel in Unreal, like the tools I made for Maya.
+- **It became a white-box generator.** I tried two Fab furniture packs, but together they were about 3.4 GB, much more than GitHub LFS's 1 GB free limit. I kept grey-box furniture and wrote a guide for swapping in real models later.
+
+**Not done from the proposal:** the light/color order and hidden-key puzzles, chaining puzzles so one unlocks the next, a timer, sound, and lighting polish (see *What doesn't work yet* and *Next steps*).
 
 ## What I made
 
@@ -81,7 +90,8 @@ My proposal was a random escape-room generator in Unreal, built with Blueprints.
 
 ## Next steps
 
-- More puzzle types for Hard: a **locked chest** opened by a hidden key, or a **clock** whose hands show part of the code.
+- The puzzle types from my proposal: a **light/color order** puzzle and a **hidden key** for a locked chest, chained so one puzzle unlocks the next (and checked by the batch test so the key is never locked inside its own chest).
+- A **clock** whose hands show part of the code.
 - Room shapes beyond rectangles (L-shaped rooms, two connected rooms).
 - Lights that scale with room size; desk lamp attached to the desk.
 - Timer, sound effects and a hint button.
