@@ -1,6 +1,6 @@
 # Escape Room White-Box Generator
 
-Research Project 1 — an Unreal Engine 5.8 tool that builds a new, solvable **white-box (grey-box) escape room** from a seed: room size, furniture layout, where the clues are hidden and the code that opens the door all change every time, and every room is guaranteed to be solvable.
+Research Project 1 — an Unreal Engine 5.8 tool that builds a new, solvable **white-box (grey-box) escape room** from a seed: room size, furniture layout, puzzle type, where the clues are hidden and the code that opens the door all change every time, and a batch test checks that the rooms are solvable (every difficulty × puzzle combination passes 100 / 100 seeds).
 
 - **Engine:** Unreal Engine 5.8 (First Person template)
 - **Game logic:** Blueprints (`BP_RoomGenerator.GenerateRoom`)
@@ -32,6 +32,8 @@ Level designers spend a lot of time hand-placing escape-room props and checking 
 
 **Not done from the proposal:** a light-switching puzzle, chaining several different puzzles in one room, a timer, sound, and lighting polish (see *What doesn't work yet* and *Next steps*).
 
+**A note on the commit history:** I started building the project in Unreal around Nov 9 but only put it in a Git repository on Nov 22, so the commits only cover the last two days.
+
 ## What I made
 
 **In the game**
@@ -41,8 +43,8 @@ Level designers spend a lot of time hand-placing escape-room props and checking 
 
 **What the generator does (`GenerateRoom`, one seed → one room)**
 1. Clears the last room and seeds a random stream, then rolls a 4-digit code.
-2. **Room size per difficulty** — moves the walls, floor, ceiling and door to that difficulty's layout (defaults: Easy 8 × 6 m, Medium 10 × 7 m, Hard 12 × 8 m).
-3. **Furniture shuffle** — places that difficulty's furniture (3 / 5 / 7 pieces) into random free slots along the walls, so no two rooms look the same and pieces never overlap. **Paintings count as furniture:** each hangs on the wall above its own slot, every room has the painting that can hide the Hard poster, and bigger rooms add up to two more paintings (they slide aside too, but hide nothing — decoys on Hard).
+2. **Room size per difficulty** — moves the walls, floor, ceiling and door to that difficulty's layout (current settings: Easy 8 × 6 m, Medium 10 × 7 m, Hard 12 × 12 m; editable in the panel).
+3. **Furniture shuffle** — places that difficulty's furniture (3 / 5 / 12 pieces — Hard asks for 16, but a 12 × 12 m room only has 12 slots) into random free slots along the walls, so no two rooms look the same and pieces never overlap. **Paintings count as furniture:** each hangs on the wall above its own slot, every room has the painting that can hide the order poster (Symbol / Color puzzles), and bigger rooms add up to two more paintings (they slide aside too, but hide nothing — decoys).
 4. **Clues** — picks clue spots only on furniture that is actually in the room. Difficulty sets how many notes the code is split into (Easy 1, Medium 2, Hard 4); the **puzzle type** (`PuzzleType`, chosen in the editor panel) sets what they look like:
 
    | Puzzle | Notes | Extra | Difficulties |
@@ -91,7 +93,9 @@ Level designers spend a lot of time hand-placing escape-room props and checking 
 
 - **Editor crash:** compiling a Blueprint while the Python/Qt Room Generator panel is open crashes Unreal (access violation in Python). Workaround: close the panel first.
 - **Lighting:** there is one ceiling light; big Hard rooms are a bit dim at the corners, and the desk-lamp light does not move with the desk.
-- **Recompiling `BP_Drawer`** re-attaches the drawer clue spots to the cabinet instead of the sliding drawer. *Apply layout* in the panel fixes it — press it after editing `BP_Drawer`.
+- **Recompiling Blueprints** (not only `BP_Drawer`) can snap the drawer clue spots to the front of the drawer instead of its floor, so notes stick out of the drawer front. *Apply layout* in the panel fixes it — press it after compiling any Blueprint.
+- The **puzzle type** can only be chosen in the editor panel; the in-game start screen only picks difficulty and seed.
+- The **lock box** always stands in the middle of the room, and the note that goes into it is not picked very evenly (on most seeds it is the same note).
 - Running the generator in the editor leaves the last room's furniture positions and difficulty in the level (the game always regenerates on start, so it does not affect play).
 - The player always starts at the same spot near the door; it is not moved for bigger rooms.
 - No timer, sound or hint system yet.
@@ -146,7 +150,7 @@ To go back to the white box, switch those two settings back.
 
 ### 7. Apply and test
 In **Escape Room → Room Generator Tool**:
-1. **Apply layout** (re-attaches drawer spots to the sliding drawer — always do this after editing `BP_Drawer`).
+1. **Apply layout** (re-attaches drawer spots to the sliding drawer — always do this after compiling a Blueprint).
 2. Run **Batch test** for each difficulty and check it says 100 / 100.
 3. Press Play and walk around.
 
